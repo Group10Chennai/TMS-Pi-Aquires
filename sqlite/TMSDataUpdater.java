@@ -70,7 +70,7 @@ public class TMSDataUpdater extends TimerTask {
             requestParam.put("vehId", 7);
             requestParam.put("count", 0);
             int master_id = 0;
-            master_id = obj.addDummyData_master(requestParam);
+            //master_id = obj.addDummyData_master(requestParam);
 
             if (master_id > 0) {
 

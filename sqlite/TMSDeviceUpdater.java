@@ -6,6 +6,8 @@
 package sqlite;
 
 import java.io.BufferedInputStream;
+import java.io.FileInputStream;
+import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.Reader;
@@ -18,22 +20,36 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.Date;
+import java.util.Properties;
 import java.util.Timer;
 import java.util.TimerTask;
+import org.apache.log4j.Logger;
 import org.json.JSONArray;
 import org.json.JSONObject;
+import org.apache.log4j.PropertyConfigurator;
 
 /**
  *
  * @author group10
  */
-//export CLASSPATH=/opt/JarFiles/sqlite-jdbc-3.19.3.jar:/opt/JarFiles/java-json.jar:/opt/JavaServices/;java sqlite.TMSDeviceUpdater
+// export CLASSPATH=/opt/Aquire/sqlite/DeviceUpdaterJars/sqlite-jdbc-3.19.3.jar:/opt/Aquire/sqlite/DeviceUpdaterJars/java-json.jar:/opt/Aquire/sqlite/DeviceUpdaterJars/log4j-1.2.17.jar:/opt/Aquire/;javac TMSDeviceUpdater.java
+// export CLASSPATH=/opt/Aquire/sqlite/DeviceUpdaterJars/sqlite-jdbc-3.19.3.jar:/opt/Aquire/sqlite/DeviceUpdaterJars/java-json.jar:/opt/Aquire/sqlite/DeviceUpdaterJars/log4j-1.2.17.jar:/opt/Aquire/;java sqlite.TMSDeviceUpdater
 public class TMSDeviceUpdater extends TimerTask {
 
+    static Logger log = Logger.getLogger(TMSDeviceUpdater.class.getName());
+    
     private long gloableLastUpdateDateTime = 1262284200000l;
 
-    private static String HOST_URL1 = "http://172.16.0.151:8080/TMS/";
-    private static String HOST_URL = "https://qas.placer.in/TMS/";
+    // Development Configurations
+    static String HOST_URL = "https://qas.placer.in/TMS/";
+
+    static int TIME_INTERVEL = 10 * 60 * 1000;
+
+    static String SQLITE_DB_PATH = "jdbc:sqlite:/opt/Aquire/sqlite/TPMS.db";
+    
+    static int DROP_TABLE_EXCEPT_LIVE_TABLE_STATUS = 0;
+    
+    static int DROP_TABLE_LIVE_TABLE_STATUS = 0;
 
     public final static void main(String args[]) {
         System.out.println("com.sqlite.sample.TMLDeviceUpdater.main() " + new Date());
@@ -41,14 +57,20 @@ public class TMSDeviceUpdater extends TimerTask {
         TMSDeviceUpdater obj = new TMSDeviceUpdater();
         Connection conn = null;
         try {
+            // Load the properties
+            setProperties();
+            
+            // Create the connection for first time
             conn = obj.connectToSQLite();
 
             Statement stmt = conn.createStatement();
             String sqlCommand = "DROP TABLE IF EXISTS DeviceDetails ";
-            System.out.println("Drop status : " + stmt.execute(sqlCommand));
-
+            if( DROP_TABLE_EXCEPT_LIVE_TABLE_STATUS == 1){
+                System.out.println("Drop status : " + stmt.execute(sqlCommand));
+            }
+            
             // create Device details table
-            String sql = "CREATE TABLE IF NOT EXISTS DeviceDetails(vehId integer PRIMARY KEY, vehName text NOT NULL, "
+            String sql = "CREATE TABLE IF NOT EXISTS DeviceDetails(vehId INTEGER PRIMARY KEY, vehName text NOT NULL, "
                     + "BID integer, BUID text, RFID integer, RFUID text)";
 
             System.out.println("create q: " + sql);
@@ -60,10 +82,13 @@ public class TMSDeviceUpdater extends TimerTask {
             }
 
             // Create Tire details table
-            sqlCommand = "DROP TABLE IF EXISTS TireDetails";
-            System.out.println("Drop status : " + stmt.execute(sqlCommand));
-            String tire_creation_sql = "CREATE TABLE IF NOT EXISTS TireDetails(tireId integer PRIMARY KEY,"
-                    + " tireNumber text NOT NULL, sensorId Integer, sensorUID text, tirePosition String, vehId Integer)";
+            if( DROP_TABLE_EXCEPT_LIVE_TABLE_STATUS == 1){
+                sqlCommand = "DROP TABLE IF EXISTS TireDetails";
+                System.out.println("Drop status : " + stmt.execute(sqlCommand));
+            }
+            
+            String tire_creation_sql = "CREATE TABLE IF NOT EXISTS TireDetails(tireId INTEGER PRIMARY KEY,"
+                    + " tireNumber text NOT NULL, sensorId Integer, sensorUID text, tirePosition String, vehId INTEGER)";
 
             System.out.println("create q: " + tire_creation_sql);
             createQStatus = stmt.execute(tire_creation_sql);
@@ -72,24 +97,47 @@ public class TMSDeviceUpdater extends TimerTask {
             } else {
                 System.out.println("Table TireDetails is already exists");
             }
-            
-            // Create Latest_data table
-            sqlCommand = "DROP TABLE IF EXISTS Latest_data ";
-            System.out.println("Drop status : " + stmt.execute(sqlCommand));
-            String latest_data_creation_sql = "CREATE TABLE IF NOT EXISTS Latest_data(latest_data_id integer PRIMARY KEY AUTOINCREMENT,"
-                    + " vehId integer NOT NULL, device_date_time Long NOT NULL, location text NOT NULL, sensorId text NOT NULL, pressure double NOT NULL,"
-                    + " temp double NOT NULL, sensor_status integer NOT NULL, status integer NOT NULL, count integer)";
 
-            System.out.println("create q: " + latest_data_creation_sql);
-            createQStatus = stmt.execute(latest_data_creation_sql);
-            if (createQStatus) {
-                System.out.println("Table Latest_data is created successfully");
-            } else {
-                System.out.println("Table Latest_data is already exists");
+            // Create table for offline future
+            // Two tables Report_data_master, Report_data_child
+            if( DROP_TABLE_LIVE_TABLE_STATUS == 1){
+                sqlCommand = "DROP TABLE IF EXISTS Report_data_master";
+                System.out.println("Drop status : " + stmt.execute(sqlCommand));
             }
             
+            String report_data_master_creation_sql = "CREATE TABLE IF NOT EXISTS"
+                    + " Report_data_master(report_data_master_id INTEGER PRIMARY KEY AUTOINCREMENT,"
+                    + " vehId INTEGER NOT NULL, device_date_time Long NOT NULL, count INTEGER)";
+
+            System.out.println("create q: " + report_data_master_creation_sql);
+            createQStatus = stmt.execute(report_data_master_creation_sql);
+            if (createQStatus) {
+                System.out.println("Table Report_data_master is created successfully");
+            } else {
+                System.out.println("Table Report_data_master is already exists");
+            }
+
+            if( DROP_TABLE_LIVE_TABLE_STATUS == 1){
+                sqlCommand = "DROP TABLE IF EXISTS Report_data_child";
+                System.out.println("Drop status : " + stmt.execute(sqlCommand));
+            }
+            
+            String report_data_child_creation_sql = "CREATE TABLE IF NOT EXISTS"
+                    + " Report_data_child(report_data_child_id INTEGER PRIMARY KEY AUTOINCREMENT,"
+                    + " report_data_master_id INTEGER NOT NULL, vehId integer NOT NULL, tireId integer, tirePosition text NOT NULL,"
+                    + " sensorUID text NOT NULL, pressure double NOT NULL, temp double NOT NULL, sensor_status text NULL)";
+
+            System.out.println("create q: " + report_data_child_creation_sql);
+            createQStatus = stmt.execute(report_data_child_creation_sql);
+            if (createQStatus) {
+                System.out.println("Table Report_data_child is created successfully");
+            } else {
+                System.out.println("Table Report_data_child is already exists");
+            }
+
         } catch (Exception e) {
             e.printStackTrace();
+            log.error(e.getMessage());
         } finally {
             try {
                 if (conn != null) {
@@ -105,9 +153,53 @@ public class TMSDeviceUpdater extends TimerTask {
             //running timer task
             Timer timer = new Timer();
             //It is going to call the run method once in every 10 sec
-            timer.scheduleAtFixedRate(timerTask, 0, 60 * 1000);
+            timer.scheduleAtFixedRate(timerTask, 0, TIME_INTERVEL);
         } catch (Exception e) {
             e.printStackTrace();
+            log.error(e.getMessage());
+        }
+    }
+
+    private static void setProperties() {
+
+        Properties prop = new Properties();
+        InputStream input = null;
+
+        try {
+            PropertyConfigurator.configure("/opt/Aquire/properties/log4j_TMSDeviceUpdater.properties");
+            input = new FileInputStream("/opt/Aquire/properties/TMSDeviceUpdater.properties");
+            // load a properties file
+            prop.load(input);
+
+            // get the property value and print it out
+            if (null != prop.getProperty("HOST_URL")) {
+                HOST_URL = prop.getProperty("HOST_URL");
+            }
+            if (null != prop.getProperty("TIME_INTERVEL")) {
+                TIME_INTERVEL = Integer.valueOf(prop.getProperty("TIME_INTERVEL"));
+            }
+            if (null != prop.getProperty("SQLITE_DB_PATH")) {
+                SQLITE_DB_PATH = prop.getProperty("SQLITE_DB_PATH");
+            }
+
+            if (null != prop.getProperty("DROP_TABLE_EXCEPT_LIVE_TABLE_STATUS")) {
+                DROP_TABLE_EXCEPT_LIVE_TABLE_STATUS = Integer.valueOf(prop.getProperty("DROP_TABLE_EXCEPT_LIVE_TABLE_STATUS"));
+            }
+            
+            if (null != prop.getProperty("DROP_TABLE_LIVE_TABLE_STATUS")) {
+                DROP_TABLE_LIVE_TABLE_STATUS = Integer.valueOf(prop.getProperty("DROP_TABLE_LIVE_TABLE_STATUS"));
+            }
+        } catch (IOException ex) {
+            ex.printStackTrace();
+            log.error(ex.getMessage());
+        } finally {
+            if (input != null) {
+                try {
+                    input.close();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
         }
     }
 
@@ -118,8 +210,9 @@ public class TMSDeviceUpdater extends TimerTask {
         callDeviceDetailsAPI(gloableLastUpdateDateTime);
         callTireDetailsAPI(gloableLastUpdateDateTime);
         gloableLastUpdateDateTime = currentDate.getTime();
-        getDeviceDetails();
-        getTireDetails();
+        //getDeviceDetails();
+        //getTireDetails();
+        log.info("last updated device date time is: "+new Date(gloableLastUpdateDateTime));
     }
 
     private void callTireDetailsAPI(long lastUpdateDateTime) {
@@ -183,9 +276,9 @@ public class TMSDeviceUpdater extends TimerTask {
         try {
             // db parameters
             Class.forName("org.sqlite.JDBC");
-            String url = "jdbc:sqlite:/opt/Aquire/sqlite/TPMS.db";
+
             // create a connection to the database
-            conn = DriverManager.getConnection(url);
+            conn = DriverManager.getConnection(SQLITE_DB_PATH);
 
             System.out.println("Connection to SQLite has been established.");
 
@@ -225,7 +318,7 @@ public class TMSDeviceUpdater extends TimerTask {
                     if (!vehDetails.isNull("rfiduid")) {
                         rfidUID = vehDetails.getString("rfiduid");
                     }
-                    
+
                     if (rs.next()) {
                         // Vehicle details are already exist
                         System.out.println(vehDetails.getString("vehName") + " already exists");

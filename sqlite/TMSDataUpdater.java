@@ -41,11 +41,11 @@ import org.apache.log4j.PropertyConfigurator;
  *
  * @author group10
  */
-// export CLASSPATH=/opt/Aquire/sqlite/DeviceUpdaterJars/sqlite-jdbc-3.19.3.jar:/opt/Aquire/sqlite/DeviceUpdaterJars/java-json.jar:/opt/Aquire/sqlite/DeviceUpdaterJars/log4j-1.2.17.jar:/opt/Aquire/;javac TMSDataUpdater.java
-// export CLASSPATH=/opt/Aquire/sqlite/DeviceUpdaterJars/sqlite-jdbc-3.19.3.jar:/opt/Aquire/sqlite/DeviceUpdaterJars/java-json.jar:/opt/Aquire/sqlite/DeviceUpdaterJars/log4j-1.2.17.jar:/opt/Aquire/;java sqlite.TMSDataUpdater
+// export CLASSPATH=/opt/Aquire/jars/sqlite-jdbc-3.19.3.jar:/opt/Aquire/jars/java-json.jar:/opt/Aquire/jars/log4j-1.2.17.jar:/opt/Aquire/;javac TMSDataUpdater.java
+// export CLASSPATH=/opt/Aquire/jars/sqlite-jdbc-3.19.3.jar:/opt/Aquire/jars/java-json.jar:/opt/Aquire/jars/log4j-1.2.17.jar:/opt/Aquire/;java sqlite.TMSDataUpdater
 public class TMSDataUpdater extends TimerTask {
 
-    static String HOST_URL = "https://qas.placer.in/TMS/";
+    static String HOST_URL = "https://tpms-api.placer.in/TMS/";
 
     static int TIME_INTERVEL = 10 * 60 * 1000;
 
@@ -75,8 +75,6 @@ public class TMSDataUpdater extends TimerTask {
             if (master_id > 0) {
 
                 requestParam.put("report_data_master_id", master_id);
-
-                System.out.println("master id: " + master_id);
 
                 // Individual tire details
                 requestParam.put("tirePosition", "01");
@@ -125,6 +123,7 @@ public class TMSDataUpdater extends TimerTask {
                 requestParam.put("pressure", 1);
                 requestParam.put("temp", 1);
                 requestParam.put("sensor_status", "000100");
+                
                 obj.addDummyData_child(requestParam);
             }
         } catch (Exception e) {
@@ -180,7 +179,7 @@ public class TMSDataUpdater extends TimerTask {
 
     @Override
     public void run() {
-        System.out.println("<<<<<<<<<<<<<<<<<<< beep " + new Date());
+        log.info("<<<<<<<<<<<<<<<<<<< beep " + new Date());
         checkAndSendDataToServer();
     }
 
@@ -192,11 +191,10 @@ public class TMSDataUpdater extends TimerTask {
             Statement stmt = conn.createStatement();
             String sql = "SELECT * FROM Report_data_master where count <= 5;";
             ResultSet rs = stmt.executeQuery(sql);
+            log.info("call api and update Size: "+ rs.getFetchSize());
             while (rs.next()) {
                 try {
                     // Send this data to server and then update the record from the database depends on API response
-                    System.out.println("call api and update");
-
                     JSONObject requestParam = new JSONObject();
                     requestParam.put("vehId", rs.getInt("vehId"));
                     requestParam.put("device_date_time", rs.getLong("device_date_time"));
@@ -214,18 +212,16 @@ public class TMSDataUpdater extends TimerTask {
                     }
                     requestParam.put("tyres", tyres);
 
-                    System.out.println(requestParam.toString());
                     // Calling API
                     JSONObject resp = callAPI(API_URL, requestParam);
                     if (null != resp) {
                         resp.put("status", false);
-                        System.out.println("1 update the count - status: " + resp.getBoolean("status"));
                         if (resp.getInt("responseCode") == 10000) {
                             // There is no internet connection
-                            System.out.println("Unable to connect to Server");
+                            log.warn("Unable to connect to Server");
                         } else if (resp.getInt("responseCode") == 10001) {
                             // There is no internet connection
-                            System.out.println("No internet connection");
+                            log.warn("No internet connection");
                         } else if (resp.getBoolean("status")) {
                             // Sent data to server successfully
                             // Delete the records from child
@@ -244,10 +240,9 @@ public class TMSDataUpdater extends TimerTask {
                             // execute the java preparedstatement
                             preparedStmt.executeUpdate();
                         } else {
-                            System.out.println("2 update the count - status: " + resp.getBoolean("status"));
                             if (count == 5) {
                                 // Send a mail with this obj and update the count
-                                System.out.println("send a mail");
+                                log.info("send a mail");
 //                                sendErrorMail("TMS Data is not updating", requestParam.toString(), TO_MAIL_ADDRESSES);
                             }
                             count++;
@@ -266,14 +261,15 @@ public class TMSDataUpdater extends TimerTask {
             }
         } catch (Exception e) {
             e.printStackTrace();
+            log.error(e.getMessage());
         } finally {
             try {
                 if (conn != null) {
                     conn.close();
-                    System.out.println("DB connection closed");
+                    log.info("DB connection closed");
                 }
             } catch (SQLException ex) {
-                System.out.println(ex.getMessage());
+                log.info(ex.getMessage());
             }
         }
     }
@@ -313,10 +309,10 @@ public class TMSDataUpdater extends TimerTask {
             // create a connection to the database
             conn = DriverManager.getConnection(SQLITE_DB_PATH);
 
-            System.out.println("Connection to SQLite has been established.");
+            log.info("Connection to SQLite has been established.");
 
         } catch (Exception e) {
-            System.out.println(e.getMessage());
+            log.info(e.getMessage());
         }
         return conn;
     }
@@ -340,7 +336,6 @@ public class TMSDataUpdater extends TimerTask {
             wr.close();
 
             int responseCode = con.getResponseCode();
-//            System.out.println("Response Code : " + responseCode);
 
             BufferedReader in = new BufferedReader(new InputStreamReader(con.getInputStream()));
             String inputLine;
@@ -353,8 +348,6 @@ public class TMSDataUpdater extends TimerTask {
 
             json_resp = new JSONObject(response.toString());
             json_resp.put("responseCode", responseCode);
-            //print result
-            System.out.println(json_resp.toString());
 
             con.disconnect();
 
@@ -367,6 +360,7 @@ public class TMSDataUpdater extends TimerTask {
                 e.printStackTrace();
             }
             ce.printStackTrace();
+            log.error(ce.getMessage());
         }catch (SocketException se) {
             //Socket exception - Connection is not established
             try {
@@ -376,6 +370,7 @@ public class TMSDataUpdater extends TimerTask {
                 e.printStackTrace();
             }
             se.printStackTrace();
+            log.error(se.getMessage());
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -401,10 +396,10 @@ public class TMSDataUpdater extends TimerTask {
             try {
                 if (conn != null) {
                     conn.close();
-                    System.out.println("DB connection closed");
+                    log.info("DB connection closed");
                 }
             } catch (SQLException ex) {
-                System.out.println(ex.getMessage());
+                log.error(ex.getMessage());
             }
         }
 
@@ -436,10 +431,10 @@ public class TMSDataUpdater extends TimerTask {
             try {
                 if (conn != null) {
                     conn.close();
-                    System.out.println("DB connection closed");
+                    log.info("DB connection closed");
                 }
             } catch (SQLException ex) {
-                System.out.println(ex.getMessage());
+                log.error(ex.getMessage());
             }
         }
     }

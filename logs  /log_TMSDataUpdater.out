@@ -1,0 +1,4 @@
+2018-02-05 18:25:42 INFO  sqlite.TMSDataUpdater:182  - <<<<<<<<<<<<<<<<<<< beep Mon Feb 05 18:25:42 IST 2018
+2018-02-05 18:25:42 INFO  sqlite.TMSDataUpdater:312  - Connection to SQLite has been established.
+2018-02-05 18:25:42 INFO  sqlite.TMSDataUpdater:194  - call api and update Size: 0
+2018-02-05 18:25:42 INFO  sqlite.TMSDataUpdater:269  - DB connection closed

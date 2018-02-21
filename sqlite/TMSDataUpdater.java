@@ -64,6 +64,9 @@ public class TMSDataUpdater extends TimerTask {
             // Load properties
             setProperties();
 
+            //Program started at
+            log.info("Boot Running Started on " + new Date());
+
             TMSDataUpdater obj = new TMSDataUpdater();
             JSONObject requestParam = new JSONObject();
             requestParam.put("device_date_time", (new Date()).getTime());
@@ -123,7 +126,7 @@ public class TMSDataUpdater extends TimerTask {
                 requestParam.put("pressure", 1);
                 requestParam.put("temp", 1);
                 requestParam.put("sensor_status", "000100");
-                
+
                 obj.addDummyData_child(requestParam);
             }
         } catch (Exception e) {
@@ -185,15 +188,17 @@ public class TMSDataUpdater extends TimerTask {
 
     private void checkAndSendDataToServer() {
         Connection conn = null;
+        int rsLength = 0;
         try {
             conn = connectToSQLite();
 
             Statement stmt = conn.createStatement();
             String sql = "SELECT * FROM Report_data_master where count <= 5;";
             ResultSet rs = stmt.executeQuery(sql);
-            log.info("call api and update Size: "+ rs.getFetchSize());
+
             while (rs.next()) {
                 try {
+                    rsLength++;
                     // Send this data to server and then update the record from the database depends on API response
                     JSONObject requestParam = new JSONObject();
                     requestParam.put("vehId", rs.getInt("vehId"));
@@ -204,7 +209,8 @@ public class TMSDataUpdater extends TimerTask {
                     int master_id = rs.getInt("report_data_master_id");
                     int count = rs.getInt("count");
                     String sql1 = "SELECT * FROM Report_data_child where report_data_master_id = " + master_id;
-                    ResultSet rs1 = stmt.executeQuery(sql1);
+                    Statement stmt1 = conn.createStatement();
+                    ResultSet rs1 = stmt1.executeQuery(sql1);
                     while (rs1.next()) {
                         JSONObject tyre = prepareTyreObj(rs1.getString("tirePosition"), rs1.getString("sensorUID"),
                                 rs1.getDouble("pressure"), rs1.getDouble("temp"), rs1.getString("sensor_status"));
@@ -212,10 +218,9 @@ public class TMSDataUpdater extends TimerTask {
                     }
                     requestParam.put("tyres", tyres);
 
-                    // Calling API
+                    // Calling API                    
                     JSONObject resp = callAPI(API_URL, requestParam);
                     if (null != resp) {
-                        resp.put("status", false);
                         if (resp.getInt("responseCode") == 10000) {
                             // There is no internet connection
                             log.warn("Unable to connect to Server");
@@ -231,7 +236,7 @@ public class TMSDataUpdater extends TimerTask {
 
                             // execute the java preparedstatement
                             preparedStmt.executeUpdate();
-                            
+
                             // Delete the record from master
                             deleteQuery = "delete from Report_data_master where report_data_master_id = ?";
                             preparedStmt = conn.prepareStatement(deleteQuery);
@@ -257,8 +262,10 @@ public class TMSDataUpdater extends TimerTask {
                     }
                 } catch (Exception e) {
                     e.printStackTrace();
+                    log.error(e.getMessage());
                 }
             }
+            log.info("call api and update Size: " + rsLength);
         } catch (Exception e) {
             e.printStackTrace();
             log.error(e.getMessage());
@@ -297,6 +304,7 @@ public class TMSDataUpdater extends TimerTask {
             tyre.put("sensor_status", sensor_status);
         } catch (Exception e) {
             e.printStackTrace();
+            log.error(e.getMessage());
         }
         return tyre;
     }
@@ -351,7 +359,7 @@ public class TMSDataUpdater extends TimerTask {
 
             con.disconnect();
 
-        } catch(ConnectException ce){
+        } catch (ConnectException ce) {
             // Unable to connect to server
             try {
                 json_resp = new JSONObject();
@@ -361,7 +369,7 @@ public class TMSDataUpdater extends TimerTask {
             }
             ce.printStackTrace();
             log.error(ce.getMessage());
-        }catch (SocketException se) {
+        } catch (SocketException se) {
             //Socket exception - Connection is not established
             try {
                 json_resp = new JSONObject();
@@ -373,6 +381,7 @@ public class TMSDataUpdater extends TimerTask {
             log.error(se.getMessage());
         } catch (Exception e) {
             e.printStackTrace();
+            log.error(e.getMessage());
         }
         return json_resp;
     }

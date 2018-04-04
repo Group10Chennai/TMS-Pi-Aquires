@@ -21,8 +21,6 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.Date;
 import java.util.Properties;
-import java.util.Timer;
-import java.util.TimerTask;
 import org.apache.log4j.BasicConfigurator;
 import org.apache.log4j.Logger;
 import org.json.JSONArray;
@@ -35,7 +33,7 @@ import org.apache.log4j.PropertyConfigurator;
  */
 // export CLASSPATH=/opt/Aquire/jars/sqlite-jdbc-3.19.3.jar:/opt/Aquire/jars/java-json.jar:/opt/Aquire/jars/log4j-1.2.17.jar:/opt/Aquire/;javac TMSDeviceUpdater.java
 // export CLASSPATH=/opt/Aquire/jars/sqlite-jdbc-3.19.3.jar:/opt/Aquire/jars/java-json.jar:/opt/Aquire/jars/log4j-1.2.17.jar:/opt/Aquire/;java sqlite.TMSDeviceUpdater
-public class TMSDeviceUpdater extends TimerTask {
+public class TMSDeviceUpdater {
 
     static Logger log = Logger.getLogger(TMSDeviceUpdater.class.getName());
 
@@ -48,12 +46,12 @@ public class TMSDeviceUpdater extends TimerTask {
 
     static String SQLITE_DB_PATH = "jdbc:sqlite:/opt/Aquire/sqlite/TPMS.db";
 
-    static int DROP_TABLE_EXCEPT_LIVE_TABLE_STATUS = 0;
-
     static int DROP_TABLE_LIVE_TABLE_STATUS = 0;
 
+    static int DROP_TABLE_DEVICE_TABLE_STATUS = 0;
+
     public final static void main(String args[]) {
-        log.info("Boot Running Started on " + new Date());
+        
         System.out.println("Boot Running Started on " + new Date());
 
         TMSDeviceUpdater obj = new TMSDeviceUpdater();
@@ -63,12 +61,13 @@ public class TMSDeviceUpdater extends TimerTask {
             BasicConfigurator.configure();
             setProperties();
 
+            log.info("<<<<<<<<<<<< Boot Running Started on " + new Date());
             // Create the connection for first time
             conn = obj.connectToSQLite();
 
             Statement stmt = conn.createStatement();
             String sqlCommand = "DROP TABLE IF EXISTS DeviceDetails ";
-            if (DROP_TABLE_EXCEPT_LIVE_TABLE_STATUS == 1) {
+            if (DROP_TABLE_DEVICE_TABLE_STATUS == 1) {
                 log.info("DeviceDetails Table dropped: " + stmt.execute(sqlCommand));
             }
 
@@ -84,7 +83,7 @@ public class TMSDeviceUpdater extends TimerTask {
             }
 
             // Create Tire details table
-            if (DROP_TABLE_EXCEPT_LIVE_TABLE_STATUS == 1) {
+            if (DROP_TABLE_DEVICE_TABLE_STATUS == 1) {
                 sqlCommand = "DROP TABLE IF EXISTS TireDetails";
                 log.info("TireDetails Table dropped: " + stmt.execute(sqlCommand));
             }
@@ -133,6 +132,8 @@ public class TMSDeviceUpdater extends TimerTask {
             } else {
                 log.info("Table Report_data_child is already exists");
             }
+            
+            obj.startRunning();
 
         } catch (Exception e) {
             e.printStackTrace();
@@ -146,16 +147,6 @@ public class TMSDeviceUpdater extends TimerTask {
             } catch (SQLException ex) {
                 log.error(ex.getMessage());
             }
-        }
-        try {
-            TimerTask timerTask = new TMSDeviceUpdater();
-            //running timer task
-            Timer timer = new Timer();
-            //It is going to call the run method once in every 10 sec
-            timer.scheduleAtFixedRate(timerTask, 0, TIME_INTERVEL);
-        } catch (Exception e) {
-            e.printStackTrace();
-            log.error(e.getMessage());
         }
     }
 
@@ -181,8 +172,8 @@ public class TMSDeviceUpdater extends TimerTask {
                 SQLITE_DB_PATH = prop.getProperty("SQLITE_DB_PATH");
             }
 
-            if (null != prop.getProperty("DROP_TABLE_EXCEPT_LIVE_TABLE_STATUS")) {
-                DROP_TABLE_EXCEPT_LIVE_TABLE_STATUS = Integer.valueOf(prop.getProperty("DROP_TABLE_EXCEPT_LIVE_TABLE_STATUS"));
+            if (null != prop.getProperty("DROP_TABLE_DEVICE_TABLE_STATUS")) {
+                DROP_TABLE_DEVICE_TABLE_STATUS = Integer.valueOf(prop.getProperty("DROP_TABLE_DEVICE_TABLE_STATUS"));
             }
 
             if (null != prop.getProperty("DROP_TABLE_LIVE_TABLE_STATUS")) {
@@ -202,9 +193,8 @@ public class TMSDeviceUpdater extends TimerTask {
         }
     }
 
-    @Override
-    public void run() {
-        log.info("<<<<<<<<<<<<<<<<<<< beep " + new Date());
+    public void startRunning() {
+//        log.info("<<<<<<<<<<<<<<<<<<< beep " + new Date());
         Date currentDate = new Date();
         callDeviceDetailsAPI(gloableLastUpdateDateTime);
         callTireDetailsAPI(gloableLastUpdateDateTime);

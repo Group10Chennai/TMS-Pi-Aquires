@@ -20,8 +20,6 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.Date;
 import java.util.Properties;
-import java.util.Timer;
-import java.util.TimerTask;
 //import javax.mail.Authenticator;
 //import javax.mail.Message;
 //import javax.mail.PasswordAuthentication;
@@ -43,7 +41,7 @@ import org.apache.log4j.PropertyConfigurator;
  */
 // export CLASSPATH=/opt/Aquire/jars/sqlite-jdbc-3.19.3.jar:/opt/Aquire/jars/java-json.jar:/opt/Aquire/jars/log4j-1.2.17.jar:/opt/Aquire/;javac TMSDataUpdater.java
 // export CLASSPATH=/opt/Aquire/jars/sqlite-jdbc-3.19.3.jar:/opt/Aquire/jars/java-json.jar:/opt/Aquire/jars/log4j-1.2.17.jar:/opt/Aquire/;java sqlite.TMSDataUpdater
-public class TMSDataUpdater extends TimerTask {
+public class TMSDataUpdater {
 
     static String HOST_URL = "https://tpms-api.placer.in/TMS/";
 
@@ -65,17 +63,20 @@ public class TMSDataUpdater extends TimerTask {
             setProperties();
 
             //Program started at
-            log.info("Boot Running Started on " + new Date());
+            log.info("<<<<<<<<<<< TMSDataUpdater - Boot Running Started on " + new Date());
+            System.out.println("TMSDataUpdater -  Boot Running Started on " + new Date());
 
             TMSDataUpdater obj = new TMSDataUpdater();
-            JSONObject requestParam = new JSONObject();
-            requestParam.put("device_date_time", (new Date()).getTime());
-            requestParam.put("vehId", 7);
-            requestParam.put("count", 0);
+
             int master_id = 0;
             //master_id = obj.addDummyData_master(requestParam);
 
             if (master_id > 0) {
+
+                JSONObject requestParam = new JSONObject();
+                requestParam.put("device_date_time", (new Date()).getTime());
+                requestParam.put("vehId", 7);
+                requestParam.put("count", 0);
 
                 requestParam.put("report_data_master_id", master_id);
 
@@ -129,19 +130,12 @@ public class TMSDataUpdater extends TimerTask {
 
                 obj.addDummyData_child(requestParam);
             }
+
+            obj.startRunning();
         } catch (Exception e) {
             e.printStackTrace();
         }
 
-        try {
-            TimerTask timerTask = new TMSDataUpdater();
-            //running timer task
-            Timer timer = new Timer();
-            //It is going to call the run method once in every 10 sec
-            timer.scheduleAtFixedRate(timerTask, 0, TIME_INTERVEL);
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
     }
 
     private static void setProperties() {
@@ -180,9 +174,8 @@ public class TMSDataUpdater extends TimerTask {
         }
     }
 
-    @Override
-    public void run() {
-        log.info("<<<<<<<<<<<<<<<<<<< beep " + new Date());
+    public void startRunning() {
+//        log.info("<<<<<<<<<<<<<<<<<<< beep " + new Date());
         checkAndSendDataToServer();
     }
 

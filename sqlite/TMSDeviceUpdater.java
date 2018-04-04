@@ -37,8 +37,6 @@ public class TMSDeviceUpdater {
 
     static Logger log = Logger.getLogger(TMSDeviceUpdater.class.getName());
 
-    private long gloableLastUpdateDateTime = 1262284200000l;
-
     // Development Configurations
     static String HOST_URL = "https://tpms-api.placer.in/TMS/";
 
@@ -51,7 +49,7 @@ public class TMSDeviceUpdater {
     static int DROP_TABLE_DEVICE_TABLE_STATUS = 0;
 
     public final static void main(String args[]) {
-        
+
         System.out.println("Boot Running Started on " + new Date());
 
         TMSDeviceUpdater obj = new TMSDeviceUpdater();
@@ -66,6 +64,18 @@ public class TMSDeviceUpdater {
             conn = obj.connectToSQLite();
 
             Statement stmt = conn.createStatement();
+
+            String last_updated_creation_sql = "CREATE TABLE IF NOT EXISTS Last_Updated_On(pId INTEGER PRIMARY KEY, dateInLong Number)";
+
+            boolean createQStatus = stmt.execute(last_updated_creation_sql);
+            if (createQStatus) {
+                log.info("Last_Updated_On Table is created successfully");
+            } else {
+                log.info("Table TireDetails is already exists");
+            }
+            //sri
+//            obj.updateTheLastUpdateDateTime(stmt, gloableLastUpdateDateTime);
+
             String sqlCommand = "DROP TABLE IF EXISTS DeviceDetails ";
             if (DROP_TABLE_DEVICE_TABLE_STATUS == 1) {
                 log.info("DeviceDetails Table dropped: " + stmt.execute(sqlCommand));
@@ -75,7 +85,7 @@ public class TMSDeviceUpdater {
             String sql = "CREATE TABLE IF NOT EXISTS DeviceDetails(vehId INTEGER PRIMARY KEY, vehName text NOT NULL, "
                     + "BID integer, BUID text, RFID integer, RFUID text)";
 
-            boolean createQStatus = stmt.execute(sql);
+            createQStatus = stmt.execute(sql);
             if (createQStatus) {
                 log.info("Table DeviceDetails is created successfully");
             } else {
@@ -132,7 +142,7 @@ public class TMSDeviceUpdater {
             } else {
                 log.info("Table Report_data_child is already exists");
             }
-            
+
             obj.startRunning();
 
         } catch (Exception e) {
@@ -193,15 +203,86 @@ public class TMSDeviceUpdater {
         }
     }
 
+    private long getLastUpdatedDateTime() {
+        long gloableLastUpdateDateTime = 1262284200000l; // 01-Jan-2010
+        Connection conn = null;
+        try {
+            conn = connectToSQLite();
+            Statement stmt = conn.createStatement();
+            String sql = "SELECT * FROM Last_Updated_On where pId = 1";
+
+            ResultSet rs = stmt.executeQuery(sql);
+
+            if (rs.next()) {
+                return rs.getLong("dateInLong");
+            }
+            rs.close();
+        } catch (Exception e) {
+            e.printStackTrace();
+        } finally {
+            try {
+                if (conn != null) {
+                    conn.close();
+                }
+            } catch (SQLException ex) {
+                log.error(ex.getMessage());
+            }
+        }
+        return gloableLastUpdateDateTime;
+    }
+
+    private boolean updateTheLastUpdateDateTime(long dateTime) {
+        Connection conn = null;
+        try {
+            conn = connectToSQLite();
+            Statement stmt = conn.createStatement();
+
+            String sql = "SELECT * FROM Last_Updated_On where pId = 1";
+
+            ResultSet rs = stmt.executeQuery(sql);
+
+            if (rs.next()) {
+                // Updated the date time
+                sql = "update Last_Updated_On set dateInLong = " + dateTime + " where pId = 1";
+            } else {
+                // Insert the date time
+                sql = "INSERT INTO Last_Updated_On(pId, dateInLong) VALUES(1, " + dateTime + ")";
+            }
+            stmt.executeUpdate(sql);
+            
+            rs.close();
+            return true;
+        } catch (Exception e) {
+            e.printStackTrace();
+        } finally {
+            try {
+                if (conn != null) {
+                    conn.close();
+                }
+            } catch (SQLException ex) {
+                log.error(ex.getMessage());
+            }
+        }
+
+        return false;
+    }
+
     public void startRunning() {
-//        log.info("<<<<<<<<<<<<<<<<<<< beep " + new Date());
         Date currentDate = new Date();
-        callDeviceDetailsAPI(gloableLastUpdateDateTime);
-        callTireDetailsAPI(gloableLastUpdateDateTime);
-        gloableLastUpdateDateTime = currentDate.getTime();
+
+        //Get last updated date time
+        long lastUpdatedDateTime = getLastUpdatedDateTime();
+
+        callDeviceDetailsAPI(lastUpdatedDateTime);
+        callTireDetailsAPI(lastUpdatedDateTime);
+
+        // Assign new date time
+        lastUpdatedDateTime = currentDate.getTime();
+        updateTheLastUpdateDateTime(lastUpdatedDateTime);
+
         //getDeviceDetails();
         //getTireDetails();
-        log.info("last updated device date time is: " + new Date(gloableLastUpdateDateTime));
+        log.info("last updated device date time is: " + new Date(lastUpdatedDateTime));
     }
 
     private void callTireDetailsAPI(long lastUpdateDateTime) {
@@ -225,7 +306,7 @@ public class TMSDeviceUpdater {
             String processStatus = status_code + "";
             JSONArray jsonResponse = new JSONArray(processStatus);
             if (jsonResponse.length() > 0) {
-                log.info("Tire detials are updated- Size: "+jsonResponse.length());
+                log.info("Tire detials are updated- Size: " + jsonResponse.length());
                 processTireDetails(jsonResponse);
             }
         } catch (Exception e) {
@@ -254,7 +335,7 @@ public class TMSDeviceUpdater {
             String processStatus = status_code + "";
             JSONArray jsonResponse = new JSONArray(processStatus);
             if (jsonResponse.length() > 0) {
-                log.info("Vehicle details are updated - Size: "+jsonResponse.length());
+                log.info("Vehicle details are updated - Size: " + jsonResponse.length());
                 processDeviceDetails(jsonResponse);
             }
         } catch (Exception e) {

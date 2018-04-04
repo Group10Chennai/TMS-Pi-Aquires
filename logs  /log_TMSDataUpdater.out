@@ -1,0 +1,4 @@
+2018-04-04 19:01:17 INFO  sqlite.TMSDataUpdater:66  - <<<<<<<<<<< TMSDataUpdater - Boot Running Started on Wed Apr 04 19:01:17 IST 2018
+2018-04-04 19:01:17 INFO  sqlite.TMSDataUpdater:313  - Connection to SQLite has been established.
+2018-04-04 19:01:17 INFO  sqlite.TMSDataUpdater:261  - call api and update Size: 0
+2018-04-04 19:01:17 INFO  sqlite.TMSDataUpdater:269  - DB connection closed

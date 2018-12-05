@@ -39,3 +39,28 @@ Open Terminal:
 2) export CLASSPATH=/opt/Aquire/jars/sqlite-jdbc-3.19.3.jar:/opt/Aquire/jars/java-json.jar:/opt/Aquire/jars/log4j-1.2.17.jar:/opt/Aquire/;java sqlite.TMSDataUpdater
 
 
+
+
+<<<<<<<<<<<<<<<>>>>>>>>>>>>>>>>>>>>>>>
+
+
+
+To compile ErrorLogParser:
+
+1) cd /opt/Aquire/sqlite
+
+2) export CLASSPATH=/opt/Aquire/jars/sqlite-jdbc-3.19.3.jar:/opt/Aquire/jars/java-json.jar:/opt/Aquire/jars/log4j-1.2.17.jar:/opt/Aquire/;javac ErrorLogParser.java
+
+
+
+To run ErrorLogParser:
+
+Open Terminal:
+
+1) cd /opt/Aquire/
+
+2) export CLASSPATH=/opt/Aquire/jars/sqlite-jdbc-3.19.3.jar:/opt/Aquire/jars/java-json.jar:/opt/Aquire/jars/log4j-1.2.17.jar:/opt/Aquire/;java sqlite.ErrorLogParser
+
+
+
+
